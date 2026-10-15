@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PostType {
+  guide
+  review
+  page
+}
+
+enum PostStatus {
+  draft
+  published
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  intro     String   @default("")
+  sortOrder Int      @default(0)
+  posts     Post[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Author {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  name       String
+  role       String   @default("")
+  short      String   @default("")
+  bio        String   @default("")
+  email      String?
+  avatarUrl  String?
+  /// [{ value, label }]
+  facts      Json     @default("[]")
+  /// ["Vacuums", ...]
+  expertise  Json     @default("[]")
+  /// [{ years, text }]
+  career     Json     @default("[]")
+  sortOrder  Int      @default(0)
+  showOnHome Boolean  @default(true)
+  posts      Post[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Post {
+  id             String     @id @default(cuid())
+  type           PostType   @default(guide)
+  status         PostStatus @default(draft)
+  slug           String
+  title          String
+  /// Short intro used on cards, search and as meta description fallback
+  excerpt        String     @default("")
+  /// The page body. Rendered as-is inside <main>.
+  html           String     @default("")
+  /// Extra CSS for this post only. Rendered in a <style> tag next to the HTML.
+  css            String     @default("")
+  coverImage     String?
+  seoTitle       String?
+  seoDescription String?
+  /// Raw JSON-LD (structured data) for this page
+  jsonLd         String?
+  /// Card metadata (guides)
+  testedCount    Int?
+  testWeeks      Int?
+  topPick        String?
+  /// Sticky "our pick" bar shown while scrolling: { name, score, price, shop, url, image }
+  stickyBar      Json?
+  newsletterPopup Boolean   @default(false)
+  featured       Boolean    @default(false)
+  categoryId     String?
+  category       Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  authorId       String?
+  author         Author?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  publishedAt    DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([type, slug])
+  @@index([status, type])
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  url       String
+  filename  String
+  mimeType  String
+  size      Int
+  alt       String   @default("")
+  driver    String
+  createdAt DateTime @default(now())
+}
+
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String?
+  createdAt DateTime @default(now())
+}
