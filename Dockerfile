@@ -15,4 +15,5 @@ COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/prisma.config.ts /app/package.json ./
 EXPOSE 4000
 # Apply pending migrations, then start the API
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# exec so node receives SIGTERM and shuts down cleanly when a release is stopped
+CMD ["sh", "-c", "npx prisma migrate deploy && exec node dist/server.js"]
