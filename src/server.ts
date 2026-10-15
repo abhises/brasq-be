@@ -33,6 +33,6 @@ app.use('/api/admin/subscribers', requireAuth, adminSubscribersRouter);
 app.use((_req, res) => { res.status(404).json({ error: 'Not found' }); });
 app.use(errorHandler);
 
-app.listen(env.port, () => {
+app.listen(env.port, env.host, () => {
   console.log(`brasq-be listening on http://localhost:${env.port} (storage: ${storage.name})`);
 });

@@ -1,0 +1,29 @@
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: "Commit SHA to roll back to (empty = the previous release)"
+        required: false
+        default: ""
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: SSH setup
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          printf 'Host prod\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/id_deploy\n' \
+            "${{ secrets.DEPLOY_HOST }}" "${{ secrets.DEPLOY_USER || 'ubuntu' }}" > ~/.ssh/config
+
+      - name: Roll back api
+        env:
+          COMMIT: ${{ inputs.commit }}
+        run: |
+          case "$COMMIT" in ''|*[!0-9a-f]*) [ -z "$COMMIT" ] || { echo "not a commit SHA"; exit 1; } ;; esac
+          ssh prod "~/brasq/infra/brasq-release rollback api ${COMMIT:+brasq-api:$COMMIT} && ~/brasq/infra/brasq-release status"

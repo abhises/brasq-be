@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# Blue/green releases for the BrasQ api and web containers (Vercel-style: the old release keeps
+# serving until the new one is healthy; a failed release is thrown away and nothing changes).
+#
+#   brasq-release deploy   <api|web> <image>   start <image> in the idle slot, health-check, switch nginx
+#   brasq-release rollback <api|web> [image]   switch back to the previous release (or redeploy <image>)
+#   brasq-release status
+set -euo pipefail
+
+ROOT="${BRASQ_ROOT:-$HOME/brasq}"
+STATE="$ROOT/state"
+UPSTREAMS=/etc/nginx/conf.d          # brasq-<app>-upstream.conf, included by nginx's http block
+KEEP_IMAGES=6                        # images kept per app for rollbacks
+mkdir -p "$STATE"
+
+log() { printf '\033[1m[%s]\033[0m %s\n' "$(date +%H:%M:%S)" "$*"; }
+die() { printf '\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
+
+app_config() {
+  case "$1" in
+    api) PORT_BLUE=4001; PORT_GREEN=4002; HEALTH=/health
+         EXTRA=(-v brasq_uploads:/app/uploads -e HOST=127.0.0.1) ;;
+    web) PORT_BLUE=3001; PORT_GREEN=3002; HEALTH=/api/health
+         EXTRA=(-e HOSTNAME=127.0.0.1) ;;
+    *) die "unknown app '$1' (api or web)" ;;
+  esac
+}
+port_of() { [ "$2" = blue ] && echo "$PORT_BLUE" || echo "$PORT_GREEN"; }
+other()   { [ "$1" = blue ] && echo green || echo blue; }
+live_color() { cat "$STATE/$1.color" 2>/dev/null || echo none; }
+
+healthy() { # app color -> waits up to ~90s
+  local app=$1 color=$2 port; port=$(port_of "$app" "$color")
+  for _ in $(seq 1 45); do
+    # a crashed or crash-looping container fails immediately instead of waiting out the timeout
+    [ "$(docker inspect -f '{{.State.Running}} {{.RestartCount}}' "brasq-$app-$color" 2>/dev/null)" = "true 0" ] || return 1
+    curl -fsS -m 3 "http://127.0.0.1:$port$HEALTH" >/dev/null 2>&1 && return 0
+    sleep 2
+  done
+  return 1
+}
+
+point_nginx() { # app color
+  local app=$1 port; port=$(port_of "$app" "$2")
+  local f="$UPSTREAMS/brasq-$app-upstream.conf" backup; backup=$(mktemp)
+  sudo cp "$f" "$backup" 2>/dev/null || true
+  echo "upstream brasq_$app { server 127.0.0.1:$port; }" | sudo tee "$f" >/dev/null
+  if ! sudo nginx -t >/dev/null 2>&1; then
+    sudo cp "$backup" "$f"; die "nginx config test failed, kept the previous upstream"
+  fi
+  sudo systemctl reload nginx
+}
+
+start_slot() { # app color image
+  local app=$1 color=$2 image=$3 port; port=$(port_of "$app" "$color")
+  docker rm -f "brasq-$app-$color" >/dev/null 2>&1 || true
+  docker run -d --name "brasq-$app-$color" --network host --restart unless-stopped \
+    --env-file "$ROOT/env/$app.env" -e PORT="$port" "${EXTRA[@]}" \
+    --log-opt max-size=10m --log-opt max-file=3 \
+    --label brasq.app="$app" "$image" >/dev/null
+}
+
+finish() { # app new-color old-color image
+  local app=$1 new=$2 old=$3 image=$4
+  echo "$new" > "$STATE/$app.color"
+  echo "$(date -Is) $new $image" >> "$STATE/$app.history"
+  if [ "$old" != none ]; then
+    sleep 5   # let in-flight requests on the old release finish
+    docker stop -t 20 "brasq-$app-$old" >/dev/null 2>&1 || true   # kept (stopped) for instant rollback
+  fi
+}
+
+deploy() {
+  local app=$1 image=$2; app_config "$app"
+  docker image inspect "$image" >/dev/null 2>&1 || die "image $image not found on this server"
+  local old new; old=$(live_color "$app"); new=$(other "$old"); [ "$old" = none ] && new=blue
+  log "$app: starting $image in the $new slot (live: $old)"
+  start_slot "$app" "$new" "$image"
+  if ! healthy "$app" "$new"; then
+    log "$app: health check FAILED, last log lines:"
+    docker logs --tail 40 "brasq-$app-$new" 2>&1 | sed 's/^/    /' || true
+    docker rm -f "brasq-$app-$new" >/dev/null 2>&1 || true
+    die "$app: release aborted, the live release ($old) was not touched"
+  fi
+  log "$app: healthy, switching traffic to $new"
+  point_nginx "$app" "$new"
+  finish "$app" "$new" "$old" "$image"
+  # prune old images of this app, keeping the newest $KEEP_IMAGES and anything a container uses
+  docker images "brasq-$app" --format '{{.Repository}}:{{.Tag}}' | tail -n +$((KEEP_IMAGES + 1)) \
+    | xargs -r docker rmi >/dev/null 2>&1 || true
+  log "$app: live on $new ($image)"
+}
+
+rollback() {
+  local app=$1 image=${2:-}; app_config "$app"
+  if [ -n "$image" ]; then
+    # accept a short commit SHA: brasq-web:1a2b3c -> brasq-web:1a2b3c<rest of sha>
+    if ! docker image inspect "$image" >/dev/null 2>&1; then
+      local match; match=$(docker images "${image%%:*}" --format '{{.Repository}}:{{.Tag}}' | grep -m1 "^$image" || true)
+      [ -n "$match" ] || die "$app: no image matching $image on the server (brasq-release status lists them)"
+      image=$match
+    fi
+    deploy "$app" "$image"; return
+  fi
+  local old new; old=$(live_color "$app"); new=$(other "$old")
+  docker inspect "brasq-$app-$new" >/dev/null 2>&1 || die "$app: no previous release container; pass an image (brasq-release status lists them)"
+  log "$app: rolling back to the $new slot ($(docker inspect -f '{{.Config.Image}}' "brasq-$app-$new"))"
+  docker start "brasq-$app-$new" >/dev/null
+  healthy "$app" "$new" || { docker stop "brasq-$app-$new" >/dev/null; die "$app: previous release is not healthy, nothing changed"; }
+  point_nginx "$app" "$new"
+  finish "$app" "$new" "$old" "$(docker inspect -f '{{.Config.Image}}' "brasq-$app-$new")"
+  log "$app: rolled back"
+}
+
+status() {
+  for app in api web; do
+    echo "== $app (live slot: $(live_color $app))"
+    docker ps -a --filter "label=brasq.app=$app" --format '   {{.Names}}  {{.Image}}  {{.Status}}'
+    echo "   recent releases:"; tail -n 5 "$STATE/$app.history" 2>/dev/null | sed 's/^/     /' || true
+    echo "   images on server:"; docker images "brasq-$app" --format '{{.Repository}}:{{.Tag}}  {{.CreatedSince}}' | sed 's/^/     /'
+  done
+}
+
+case "${1:-}" in
+  deploy)   [ $# -eq 3 ] || die "usage: brasq-release deploy <api|web> <image>"; deploy "$2" "$3" ;;
+  rollback) [ $# -ge 2 ] || die "usage: brasq-release rollback <api|web> [image]"; rollback "$2" "${3:-}" ;;
+  status)   status ;;
+  *) sed -n '2,9p' "$0"; exit 1 ;;
+esac

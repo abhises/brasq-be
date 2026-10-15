@@ -11,6 +11,8 @@ function required(name: string): string {
 export const env = {
   isProd,
   port: Number(process.env.PORT ?? 4000),
+  // 127.0.0.1 in production (nginx in front); all interfaces by default for Docker/dev
+  host: process.env.HOST ?? '0.0.0.0',
   databaseUrl: required('DATABASE_URL'),
   publicUrl: (process.env.PUBLIC_URL ?? 'http://localhost:4000').replace(/\/$/, ''),
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',').map((s) => s.trim()).filter(Boolean),

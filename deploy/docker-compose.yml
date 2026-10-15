@@ -1,0 +1,26 @@
+# Production database. The api and web containers are not managed here: brasq-release runs them
+# blue/green next to each other (see README.md in this folder).
+name: brasq
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: brasq
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in ~/brasq/env/db.env}
+      POSTGRES_DB: brasq
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brasq"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+  # uploaded images (STORAGE_DRIVER=local); mounted into the api containers by brasq-release
+  uploads:
