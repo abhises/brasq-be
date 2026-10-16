@@ -4,7 +4,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import { prisma } from '../db.js';
-import { HttpError, slugify } from '../lib/http.js';
+import { HttpError, paging, slugify } from '../lib/http.js';
 import { storage } from '../lib/storage/index.js';
 
 export const adminMediaRouter = Router();
@@ -27,8 +27,13 @@ async function save(body: Buffer, originalName: string, mimeType: string, alt = 
   return prisma.media.create({ data: { key, url, filename: originalName, mimeType, size: body.length, alt, driver: storage.name } });
 }
 
-adminMediaRouter.get('/', async (_req, res) => {
-  res.json({ media: await prisma.media.findMany({ orderBy: { createdAt: 'desc' } }) });
+adminMediaRouter.get('/', async (req, res) => {
+  const pg = paging(req.query);
+  const [media, total] = await Promise.all([
+    prisma.media.findMany({ orderBy: { createdAt: 'desc' }, ...pg.args }),
+    prisma.media.count(),
+  ]);
+  res.json({ media, ...pg.meta(total) });
 });
 
 /** multipart/form-data with a "file" field (and optional "alt") */

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db.js';
-import { HttpError, slugify } from '../lib/http.js';
+import { HttpError, paging, slugify } from '../lib/http.js';
 
 export const adminCategoriesRouter = Router();
 
@@ -9,9 +9,13 @@ const categoryInput = z.object({
   name: z.string().min(1), slug: z.string(), intro: z.string(), sortOrder: z.number().int(),
 }).partial();
 
-adminCategoriesRouter.get('/', async (_req, res) => {
-  const categories = await prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }], include: { _count: { select: { posts: true } } } });
-  res.json({ categories });
+adminCategoriesRouter.get('/', async (req, res) => {
+  const pg = paging(req.query);
+  const [categories, total] = await Promise.all([
+    prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }], include: { _count: { select: { posts: true } } }, ...pg.args }),
+    prisma.category.count(),
+  ]);
+  res.json({ categories, ...pg.meta(total) });
 });
 adminCategoriesRouter.post('/', async (req, res) => {
   const d = categoryInput.required({ name: true }).parse(req.body);
@@ -39,9 +43,13 @@ const authorInput = z.object({
   sortOrder: z.number().int(), showOnHome: z.boolean(),
 }).partial();
 
-adminAuthorsRouter.get('/', async (_req, res) => {
-  const authors = await prisma.author.findMany({ orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }], include: { _count: { select: { posts: true } } } });
-  res.json({ authors });
+adminAuthorsRouter.get('/', async (req, res) => {
+  const pg = paging(req.query);
+  const [authors, total] = await Promise.all([
+    prisma.author.findMany({ orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }], include: { _count: { select: { posts: true } } }, ...pg.args }),
+    prisma.author.count(),
+  ]);
+  res.json({ authors, ...pg.meta(total) });
 });
 adminAuthorsRouter.get('/:id', async (req, res) => {
   const author = await prisma.author.findUnique({ where: { id: req.params.id } });
@@ -66,12 +74,17 @@ adminAuthorsRouter.delete('/:id', async (req, res) => {
 export const adminSubscribersRouter = Router();
 
 adminSubscribersRouter.get('/', async (req, res) => {
-  const subscribers = await prisma.subscriber.findMany({ orderBy: { createdAt: 'desc' } });
-  if (req.query.format === 'csv') {
+  const csv = req.query.format === 'csv';
+  const pg = paging(csv ? {} : req.query);
+  const [subscribers, total] = await Promise.all([
+    prisma.subscriber.findMany({ orderBy: { createdAt: 'desc' }, ...pg.args }),
+    prisma.subscriber.count(),
+  ]);
+  if (csv) {
     res.type('text/csv').attachment('subscribers.csv');
     return res.send(['email,source,created_at', ...subscribers.map((s) => `${s.email},${s.source ?? ''},${s.createdAt.toISOString()}`)].join('\n'));
   }
-  res.json({ subscribers });
+  res.json({ subscribers, ...pg.meta(total) });
 });
 adminSubscribersRouter.delete('/:id', async (req, res) => {
   await prisma.subscriber.delete({ where: { id: req.params.id } });

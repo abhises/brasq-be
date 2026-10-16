@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma, Prisma } from '../db.js';
-import { HttpError, slugify } from '../lib/http.js';
+import { HttpError, paging, slugify } from '../lib/http.js';
 
 export const adminPostsRouter = Router();
 
@@ -68,15 +68,16 @@ adminPostsRouter.get('/', async (req, res) => {
     status: z.enum(['draft', 'published']).optional(),
     q: z.string().optional(),
   }).parse(req.query);
-  const posts = await prisma.post.findMany({
-    where: {
-      type: q.type, status: q.status,
-      ...(q.q ? { OR: [{ title: { contains: q.q, mode: 'insensitive' } }, { slug: { contains: q.q, mode: 'insensitive' } }] } : {}),
-    },
-    select: listSelect,
-    orderBy: { updatedAt: 'desc' },
-  });
-  res.json({ posts });
+  const where: Prisma.PostWhereInput = {
+    type: q.type, status: q.status,
+    ...(q.q ? { OR: [{ title: { contains: q.q, mode: 'insensitive' } }, { slug: { contains: q.q, mode: 'insensitive' } }] } : {}),
+  };
+  const pg = paging(req.query);
+  const [posts, total] = await Promise.all([
+    prisma.post.findMany({ where, select: listSelect, orderBy: { updatedAt: 'desc' }, ...pg.args }),
+    prisma.post.count({ where }),
+  ]);
+  res.json({ posts, ...pg.meta(total) });
 });
 
 adminPostsRouter.get('/:id', async (req, res) => {
