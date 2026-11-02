@@ -78,6 +78,11 @@ model Post {
   topPick        String?
   /// Sticky "our pick" bar shown while scrolling: { name, score, price, shop, url, image }
   stickyBar      Json?
+  /// Section-based content: { layout: "toc" | "wide", items: [{ id, type, data, hidden? }] }.
+  /// When set, `html` is rendered from it on save; when null the post is plain HTML.
+  sections       Json?
+  /// Unpublished edits to `sections` (used by the front page: edit, preview, then publish)
+  draftSections  Json?
   newsletterPopup Boolean   @default(false)
   featured       Boolean    @default(false)
   categoryId     String?
@@ -109,4 +114,48 @@ model Subscriber {
   email     String   @unique
   source    String?
   createdAt DateTime @default(now())
+}
+
+/// A reusable block for posts and the front page: fields (form), an HTML template and CSS.
+model SectionType {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  group       String   @default("Other")
+  description String   @default("")
+  /// [{ key, label, type, required?, help?, options?, fields? }]
+  fields      Json     @default("[]")
+  /// HTML with {{placeholders}}, {{#list}}…{{/list}} and {{^empty}}…{{/empty}}
+  template    String   @default("")
+  /// CSS for custom types; scoped to the section automatically. Built-in types use brasq.css.
+  css         String   @default("")
+  /// Sample field values for previews
+  sample      Json     @default("{}")
+  /// Table-of-contents label, a template like "{{heading}}"; empty = not in the TOC
+  tocLabel    String   @default("")
+  /// "body" (main column), "top" (full width above the columns) or "bottom" (full width below)
+  placement   String   @default("body")
+  /// "any", "post" or "home" (front page only)
+  scope       String   @default("any")
+  builtIn     Boolean  @default(false)
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// Shared product data used by section fields of type "product".
+model Product {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  name       String
+  score      Float?
+  price      Float?
+  image      String?
+  /// [{ name: "Amazon", url }]
+  shops      Json     @default("[]")
+  /// Slug of the product's review post, if any
+  reviewSlug String?
+  summary    String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

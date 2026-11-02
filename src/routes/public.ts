@@ -4,6 +4,7 @@ import { identify } from '../lib/auth.js';
 import { prisma, Prisma } from '../db.js';
 import { HttpError } from '../lib/http.js';
 import { ARTICLE_TYPES, postType } from '../lib/post-types.js';
+import { scopeCss } from '../lib/sections/css.js';
 
 export const publicRouter = Router();
 
@@ -116,6 +117,12 @@ publicRouter.post('/subscribe', async (req, res) => {
   const { email, source } = z.object({ email: z.string().email(), source: z.string().max(200).optional() }).parse(req.body);
   await prisma.subscriber.upsert({ where: { email: email.toLowerCase() }, create: { email: email.toLowerCase(), source }, update: {} });
   res.status(201).json({ ok: true });
+});
+
+/** CSS of the admin-made section types, each scoped to its own sections. */
+publicRouter.get('/sections.css', async (_req, res) => {
+  const types = await prisma.sectionType.findMany({ where: { NOT: { css: '' } }, select: { key: true, css: true }, orderBy: { key: 'asc' } });
+  res.type('text/css').set('Cache-Control', 'public, max-age=60').send(types.map((t) => `/* ${t.key} */\n${scopeCss(t.css, `.bq-sec--${t.key}`)}`).join('\n'));
 });
 
 publicRouter.get('/sitemap', async (_req, res) => {

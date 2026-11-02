@@ -1,0 +1,27 @@
+import { prisma, Prisma } from '../../db.js';
+import { BUILTINS } from './builtins.js';
+import { postsUsing, rerenderPost } from './render.js';
+
+/** Creates or updates the built-in section types; re-renders posts whose built-in type changed. */
+export async function syncBuiltins() {
+  const changed: string[] = [];
+  for (const b of BUILTINS) {
+    const data = {
+      name: b.name, group: b.group, description: b.description, fields: b.fields as unknown as Prisma.InputJsonValue,
+      template: b.template, css: '', sample: b.sample as Prisma.InputJsonValue, tocLabel: b.tocLabel ?? '',
+      placement: b.placement ?? 'body', scope: b.scope ?? 'any', builtIn: true, version: b.version,
+    };
+    const row = await prisma.sectionType.findUnique({ where: { key: b.key } });
+    if (!row) { await prisma.sectionType.create({ data: { key: b.key, ...data } }); continue; }
+    if (!row.builtIn) continue; // an admin-made type with the same key wins
+    if (row.version !== b.version || row.template !== b.template || JSON.stringify(row.fields) !== JSON.stringify(b.fields) || row.tocLabel !== (b.tocLabel ?? '')) {
+      await prisma.sectionType.update({ where: { key: b.key }, data });
+      changed.push(b.key);
+    }
+  }
+  if (changed.length) {
+    const posts = await postsUsing(changed);
+    for (const p of posts) await rerenderPost(p.id);
+    console.log(`Section types updated: ${changed.join(', ')} · ${posts.length} posts re-rendered`);
+  }
+}

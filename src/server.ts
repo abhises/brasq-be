@@ -7,6 +7,10 @@ import { uploadRoot } from './lib/storage/local.js';
 import { storage } from './lib/storage/index.js';
 import { adminMediaRouter } from './routes/admin-media.js';
 import { adminPostsRouter } from './routes/admin-posts.js';
+import { adminSectionsRouter } from './routes/admin-sections.js';
+import { adminProductsRouter } from './routes/admin-products.js';
+import { adminFrontPageRouter, publicFrontPage } from './routes/front-page.js';
+import { syncBuiltins } from './lib/sections/sync.js';
 import { adminAuthorsRouter, adminCategoriesRouter, adminSubscribersRouter } from './routes/admin-taxonomy.js';
 import { authRouter } from './routes/auth.js';
 import { publicRouter } from './routes/public.js';
@@ -23,15 +27,21 @@ app.get('/health', (_req, res) => { res.json({ ok: true, storage: storage.name }
 app.use('/uploads', express.static(uploadRoot, { maxAge: '30d', immutable: true, fallthrough: false }));
 
 app.use('/api/auth', authRouter);
+app.get('/api/public/front-page', (req, res, next) => { publicFrontPage(req, res).catch(next); });
 app.use('/api/public', publicRouter);
 app.use('/api/admin/posts', requireAuth, adminPostsRouter);
 app.use('/api/admin/categories', requireAuth, adminCategoriesRouter);
 app.use('/api/admin/authors', requireAuth, adminAuthorsRouter);
 app.use('/api/admin/media', requireAuth, adminMediaRouter);
 app.use('/api/admin/subscribers', requireAuth, adminSubscribersRouter);
+app.use('/api/admin/section-types', requireAuth, adminSectionsRouter);
+app.use('/api/admin/products', requireAuth, adminProductsRouter);
+app.use('/api/admin/front-page', requireAuth, adminFrontPageRouter);
 
 app.use((_req, res) => { res.status(404).json({ error: 'Not found' }); });
 app.use(errorHandler);
+
+syncBuiltins().catch((e) => console.error('Could not sync built-in section types:', e));
 
 app.listen(env.port, env.host, () => {
   console.log(`brasq-be listening on http://localhost:${env.port} (storage: ${storage.name})`);

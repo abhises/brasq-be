@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma, Prisma } from '../db.js';
 import { HttpError, paging, slugify } from '../lib/http.js';
 import { postType } from '../lib/post-types.js';
+import { postContext, renderDoc, rerenderPost, sectionsDocSchema } from '../lib/sections/render.js';
 
 export const adminPostsRouter = Router();
 
@@ -27,6 +28,8 @@ const postInput = z.object({
   testWeeks: z.number().int().nullable(),
   topPick: z.string().nullable(),
   stickyBar,
+  /** Section-based content; `null` turns a post back into plain HTML. When set, `html` is generated from it. */
+  sections: sectionsDocSchema.nullable(),
   newsletterPopup: z.boolean(),
   featured: z.boolean(),
   /** Category / author can be passed as id or slug */
@@ -40,8 +43,9 @@ const postInput = z.object({
 type PostInput = z.infer<typeof postInput>;
 
 async function toData(input: PostInput, existing?: { status: string; publishedAt: Date | null }) {
-  const { categorySlug, authorSlug, stickyBar: bar, ...rest } = input;
+  const { categorySlug, authorSlug, stickyBar: bar, sections, ...rest } = input;
   const data: Record<string, unknown> = { ...rest };
+  if (sections !== undefined) data.sections = sections === null ? Prisma.DbNull : sections;
   if (input.slug !== undefined) data.slug = slugify(input.slug);
   if (bar !== undefined) data.stickyBar = bar === null ? Prisma.DbNull : bar;
   if (categorySlug !== undefined) {
@@ -70,7 +74,7 @@ adminPostsRouter.get('/', async (req, res) => {
     q: z.string().optional(),
   }).parse(req.query);
   const where: Prisma.PostWhereInput = {
-    type: q.type, status: q.status,
+    type: q.type, status: q.status, NOT: { type: 'page', slug: 'front-page' },
     ...(q.q ? { OR: [{ title: { contains: q.q, mode: 'insensitive' } }, { slug: { contains: q.q, mode: 'insensitive' } }] } : {}),
   };
   const pg = paging(req.query);
@@ -79,6 +83,23 @@ adminPostsRouter.get('/', async (req, res) => {
     prisma.post.count({ where }),
   ]);
   res.json({ posts, ...pg.meta(total) });
+});
+
+/** Renders unsaved sections for the editor's live preview, using the post settings from the form. */
+adminPostsRouter.post('/preview', async (req, res) => {
+  const b = z.object({
+    sections: sectionsDocSchema, type: postType.default('guide'), slug: z.string().default('preview'), title: z.string().default(''),
+    excerpt: z.string().default(''), coverImage: z.string().nullable().default(null), testedCount: z.number().nullable().default(null),
+    testWeeks: z.number().nullable().default(null), topPick: z.string().nullable().default(null),
+    categoryId: z.string().nullable().default(null), authorId: z.string().nullable().default(null),
+  }).parse(req.body);
+  const [category, author] = await Promise.all([
+    b.categoryId ? prisma.category.findUnique({ where: { id: b.categoryId } }) : null,
+    b.authorId ? prisma.author.findUnique({ where: { id: b.authorId } }) : null,
+  ]);
+  const { sections, ...fields } = b;
+  const html = await renderDoc(sections, postContext({ ...fields, title: fields.title || 'Untitled', category, author, updatedAt: new Date() }));
+  res.json({ html });
 });
 
 adminPostsRouter.get('/:id', async (req, res) => {
@@ -90,7 +111,8 @@ adminPostsRouter.get('/:id', async (req, res) => {
 adminPostsRouter.post('/', async (req, res) => {
   const input = postInput.required({ type: true, title: true }).parse(req.body);
   const data = await toData({ ...input, slug: input.slug || input.title });
-  const post = await prisma.post.create({ data: data as Prisma.PostUncheckedCreateInput });
+  let post = await prisma.post.create({ data: data as Prisma.PostUncheckedCreateInput });
+  if (await rerenderPost(post.id)) post = (await prisma.post.findUnique({ where: { id: post.id } }))!;
   res.status(201).json({ post });
 });
 
@@ -101,11 +123,13 @@ adminPostsRouter.put('/by-slug/:type/:slug', async (req, res) => {
   const input = postInput.parse(req.body);
   const existing = await prisma.post.findUnique({ where: { type_slug: { type, slug } } });
   if (existing) {
-    const post = await prisma.post.update({ where: { id: existing.id }, data: (await toData(input, existing)) as Prisma.PostUncheckedUpdateInput });
+    let post = await prisma.post.update({ where: { id: existing.id }, data: (await toData(input, existing)) as Prisma.PostUncheckedUpdateInput });
+    if (await rerenderPost(post.id)) post = (await prisma.post.findUnique({ where: { id: post.id } }))!;
     return res.json({ post, created: false });
   }
   if (!input.title) throw new HttpError(400, 'title is required to create a post');
-  const post = await prisma.post.create({ data: (await toData({ ...input, type, slug })) as Prisma.PostUncheckedCreateInput });
+  let post = await prisma.post.create({ data: (await toData({ ...input, type, slug })) as Prisma.PostUncheckedCreateInput });
+  if (await rerenderPost(post.id)) post = (await prisma.post.findUnique({ where: { id: post.id } }))!;
   res.status(201).json({ post, created: true });
 });
 
@@ -113,7 +137,8 @@ adminPostsRouter.patch('/:id', async (req, res) => {
   const existing = await prisma.post.findUnique({ where: { id: req.params.id } });
   if (!existing) throw new HttpError(404, 'Post not found');
   const data = await toData(postInput.parse(req.body), existing);
-  const post = await prisma.post.update({ where: { id: existing.id }, data: data as Prisma.PostUncheckedUpdateInput });
+  let post = await prisma.post.update({ where: { id: existing.id }, data: data as Prisma.PostUncheckedUpdateInput });
+  if (await rerenderPost(post.id)) post = (await prisma.post.findUnique({ where: { id: post.id } }))!;
   res.json({ post });
 });
 

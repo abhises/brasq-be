@@ -45,7 +45,7 @@ DELETE /api/admin/media/:id
 GET    /api/admin/subscribers[?format=csv]
 ```
 
-Post fields: `type` (guide|review|comparison|informational|page), `status` (draft|published), `slug`, `title`, `excerpt`, `html`, `css`,
+Post fields: `type` (guide|review|comparison|informational|page), `sections` (section-based content, see CONTENT_GUIDE.md → Sections; when set, `html` is generated), `status` (draft|published), `slug`, `title`, `excerpt`, `html`, `css`,
 `coverImage`, `seoTitle`, `seoDescription`, `jsonLd`, `testedCount`, `testWeeks`, `topPick`,
 `stickyBar` ({name, score, price, shop, url, image} or null), `newsletterPopup`, `featured` (home hero),
 `categoryId`/`categorySlug`, `authorId`/`authorSlug`, `publishedAt`.
@@ -63,3 +63,18 @@ curl -X PUT http://localhost:4000/api/admin/posts/by-slug/guide/best-air-purifie
 `src/lib/storage/` has a `local` driver (writes to `UPLOAD_DIR`, served at `PUBLIC_URL/uploads/...`) and an `s3` driver
 (`S3_BUCKET`, `S3_REGION`, `S3_PUBLIC_URL`, `S3_PREFIX`; credentials from the standard AWS chain). The bucket or CDN must
 allow public reads of the uploaded objects. Each media row records which driver stored it.
+
+### Sections, products and the front page
+
+```
+GET    /api/admin/section-types[?preview=1]     section types with usage counts (and preview HTML)
+POST   /api/admin/section-types                 create a custom type   PATCH /:key  update (re-renders pages using it)
+POST   /api/admin/section-types/:key/duplicate  DELETE /:key (only when unused)   POST /preview  render unsaved work
+GET    /api/admin/products?q=                   POST · PATCH /:id (re-renders pages using it) · DELETE /:id
+GET    /api/admin/front-page                    PUT /draft · POST /publish · POST /discard · POST /preview
+GET    /api/public/front-page[?preview=1]       live front page HTML (null until published)
+GET    /api/public/sections.css                 CSS of custom section types, scoped per type
+```
+
+Built-in section types live in `src/lib/sections/builtins*.ts` and are synced into the database on startup (bump a type's
+`version` when you change it; pages using it are re-rendered).

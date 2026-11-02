@@ -7,6 +7,7 @@
  */
 import { authors, G } from './data.js';
 import { amazon, authorPhoto, authorUrl, catById, esc, guidePhoto, libPhoto, productPhoto, products, usd, type Pick } from './templates.js';
+import { batteryInfoRow } from './info-battery.js';
 
 const sc = (n: number) => n.toFixed(1);
 const nb = (s: unknown) => esc(s).replace(/ /g, '&nbsp;');
@@ -289,26 +290,6 @@ export const EXPLAINERS: Explainer[] = [
     nextLine: 'This article explains how the parts work. To see which robots do it best, start with our tests.',
     next: [['guide', 'robot-vacuums'], ['comparison', 'robot-vacuum-picks-compared'], ['review', P7]],
     sources: ['BrasQ robot vacuum test data, 2021–2026 (63 robots)', 'IEC 62929: Cleaning robots for household use, methods for measuring performance', 'Manufacturer manuals and spec sheets'] },
-  { slug: 'cordless-vacuum-batteries-explained', cat: 'cleaning', author: 'sarah', guide: 'stick-vacuums', updated: 'September 29, 2026', published: 'July 1, 2026', basedOn: '22 stick vacuums measured', photo: 'V2',
-    title: 'Cordless vacuum batteries explained: runtime, volts and how to make them last',
-    excerpt: 'The runtime on the box is measured on the lowest setting. Here is what you actually get, and how to keep a battery going for years.',
-    take: ['Advertised runtime is measured on the lowest setting with a small nozzle. On standard power, expect about half.', 'Watt-hours (Wh) tell you more about capacity than volts or milliamp-hours alone.', 'A click-in battery is worth paying for: a spare doubles your runtime and replacing it takes seconds.', 'Heat shortens battery life more than anything else. Don’t charge it in a hot garage.'],
-    sections: [
-      { id: 'i-claims', h: 'Advertised runtime vs what we measured', p: ['Manufacturers quote runtime on the eco setting with a small tool attached, because that draws the least power. Nobody vacuums a whole house that way.'],
-        table: { head: ['Model', 'Advertised', 'Standard setting', 'Boost'], rows: [['Vorta S9', '70 min', '48 min', '11 min'], ['Kleen Air 300', '50 min', '35 min', '8 min'], ['Northwind X2', '90 min', '60 min', '14 min']], note: 'Measured from a full charge with the floor head on hardwood.' } },
-      { id: 'i-numbers', h: 'What the numbers on the battery mean', p: ['Three numbers appear on most batteries. Only one of them tells you how much energy is inside.'],
-        cards: [['Volts (V)', 'The pressure the battery delivers. Higher volts allow a stronger motor, but say nothing about runtime.'], ['Milliamp-hours (mAh)', 'Capacity at that voltage. Only comparable between batteries with the same voltage.'], ['Watt-hours (Wh)', 'Volts times amp-hours: the total energy. This is the number to compare.']] },
-      { id: 'i-swap', h: 'Fixed, screw-in or click-in?', p: ['A click-in battery comes out in a second, so you can charge a spare while you vacuum. A screw-in battery takes five minutes with a screwdriver. A fixed battery means a service center when it wears out.'],
-        callout: { k: 'Our advice', h: 'Pay a little more for a click-in battery', t: 'Batteries wear out after three to five years. A click-in spare costs $49 to $89, while a vacuum with a fixed battery often isn’t worth repairing.' } },
-      { id: 'i-care', h: 'How to make a battery last', p: ['Lithium-ion batteries wear out from heat and from sitting completely full or empty for long periods.'],
-        steps: [['Store it indoors', 'Above 95 °F, as in a summer garage, a battery ages much faster.'], ['Don’t run it flat every time', 'Stopping at 10 to 20 percent is gentler than running until the motor cuts out.'], ['Use boost only when you need it', 'Boost drains the battery four times faster and heats it up.'], ['Charge before long storage', 'Going away for a month? Leave it at about half charge, not full and not empty.']] },
-    ],
-    myths: [['You must drain the battery before charging.', 'That was true for old nickel batteries. Lithium-ion prefers partial charges.'], ['More volts means longer runtime.', 'Volts say nothing about runtime. Compare watt-hours.']],
-    gloss: [['Lithium-ion', 'The battery type in every cordless vacuum we tested.'], ['Charge cycle', 'One full discharge and recharge. Most batteries last 500 to 1,000.']],
-    faq: [['How long does a stick vacuum battery last?', 'Three to five years with normal use, after which runtime drops noticeably.'], ['Can I use a third-party battery?', 'Often yes, but quality varies and it may void the warranty. Look for a stated capacity in Wh.']],
-    nextLine: 'Runtime is one part of the picture. See how the batteries held up in our full stick vacuum tests.',
-    next: [['guide', 'stick-vacuums'], ['comparison', 'vorta-s9-vs-northwind-x2'], ['review', VS]],
-    sources: ['BrasQ stick vacuum test data (2026)', 'Battery University: How to prolong lithium-based batteries', 'Manufacturer manuals and spec sheets'] },
   { slug: 'how-to-descale-a-coffee-maker', cat: 'kitchen', author: 'thomas', guide: 'coffee-makers', updated: 'September 8, 2026', published: 'May 12, 2026', basedOn: '12 machines descaled in our test kitchen', photo: 'C1',
     title: 'How to descale a coffee maker, and how often you really need to',
     excerpt: 'Scale makes coffee taste flat and slowly ruins the heater. How to remove it, how often to do it for your water, and why vinegar is a bad idea.',
@@ -340,7 +321,7 @@ function nextCard([kind, id]: Explainer['next'][number]) {
 function sectionHtml(s: Section) {
   const out: string[] = [`<section id="${s.id}" class="bq-section">`, `  <h2 class="bq-h2">${esc(s.h)}</h2>`];
   for (const p of s.p ?? []) out.push(`  <p class="bq-p">${esc(p)}</p>`);
-  if (s.steps) out.push(`  <ol class="bq-numbered bq-numbered--boxed">${s.steps.map(([h, t]) => `<li><div><strong>${esc(h)}</strong><p>${esc(t)}</p></div></li>`).join('')}</ol>`);
+  if (s.steps) out.push(`  <ol class="bq-nsteps bq-nsteps--titled">${s.steps.map(([h, t]) => `<li><div><strong>${esc(h)}</strong><p>${esc(t)}</p></div></li>`).join('')}</ol>`);
   if (s.table) out.push(`  <div class="bq-table-wrap"><table class="bq-table">
     <thead><tr>${s.table.head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>
     <tbody>${s.table.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>
@@ -359,11 +340,11 @@ export function informationalHtml(x: Explainer) {
   const links = items.map(([l, id]) => `<a href="#${id}">${esc(l)}</a>`).join('\n    ');
   const minutes = Math.max(1, Math.round(words(x) / 230));
 
-  return `<article class="bq-article bq-explainer">
+  return `<article class="bq-article bq-infopost">
 <nav class="bq-crumbs"><a href="/">Home</a><a href="/category/${cat.id}">${esc(cat.name)}</a><a href="/guide/${g.id}">${esc(g.short)}</a><span>Explained</span></nav>
 <div class="bq-guide-top">
   <header class="bq-guide-head">
-    <span class="bq-tag bq-tag--dark">Explained</span>
+    <div class="bq-tagline"><span class="bq-tag bq-tag--dark">Explained</span><span>${minutes} min read</span></div>
     <h1 class="bq-h1">${esc(x.title)}</h1>
     <p class="bq-lead">${esc(x.excerpt)}</p>
     <div class="bq-meta">
@@ -371,16 +352,19 @@ export function informationalHtml(x: Explainer) {
       <div>Reviewed by<br><a href="${authorUrl('ryan')}">Ryan Mitchell</a>, editor-in-chief</div>
       <div>Updated<br><strong>${nb(x.updated)}</strong></div>
       <div>Based on<br><strong>${esc(x.basedOn)}</strong></div>
-      <div>Reading time<br><strong>${minutes}&nbsp;minutes</strong></div>
     </div>
-    <p class="bq-disclosure">This article explains a topic and doesn’t rank products. It links to our tests, and we may earn a commission through those links. <a href="/how-we-make-money">Affiliate policy</a></p>
+    <div class="bq-disclosure-row">
+      <p class="bq-disclosure">This article explains a topic and doesn’t rank products. It links to our tests, and we may earn a commission through those links. <a href="/how-we-make-money">Affiliate policy</a></p>
+      <button type="button" class="bq-btn-outline-sm" data-bq-copy>Copy link</button>
+    </div>
   </header>
-  <div class="bq-photo bq-guide-hero"><img src="${esc(libPhoto(x.photo))}" alt="${esc(x.title)}" loading="lazy"></div>
+  <figure class="bq-hero-fig"><div class="bq-photo"><img src="${esc(libPhoto(x.photo))}" alt="${esc(x.title)}" loading="lazy"></div></figure>
 </div>
 <div class="bq-layout">
-  <aside class="bq-toc">
+  <aside class="bq-toc" data-bq-spy>
     <div class="bq-toc__title">In this article</div>
     ${links}
+    <a class="bq-toc__top" href="#">Back to top ↑</a>
   </aside>
   <div class="bq-content">
 <details class="bq-toc-mobile"><summary>In this article</summary><nav>${links}</nav></details>
@@ -393,8 +377,8 @@ export function informationalHtml(x: Explainer) {
 ${x.sections.map(sectionHtml).join('\n\n')}
 ${x.myths.length ? `
 <section id="i-myths" class="bq-section">
-  <h2 class="bq-h2">Myths we hear most</h2>
-  <div class="bq-myths">${x.myths.map(([m, f]) => `<div class="bq-myth"><span class="bq-myth__k">Myth</span><strong>${esc(m)}</strong><span class="bq-myth__k bq-myth__k--ok">What we found</span><p>${esc(f)}</p></div>`).join('')}</div>
+  <h2 class="bq-h2">Myths, checked</h2>
+  <div class="bq-claims">${x.myths.map(([m, f]) => `<div class="bq-claim"><div><span class="bq-verdict-tag">Myth</span><strong>${esc(m)}</strong></div><p>${esc(f)}</p></div>`).join('')}</div>
 </section>` : ''}
 
 <section id="i-next" class="bq-next">
@@ -413,14 +397,14 @@ ${x.gloss.length ? `
 ${x.faq.map(([q, ans]) => `  <details><summary>${esc(q)}</summary><p>${esc(ans)}</p></details>`).join('\n')}
 </section>
 
-<section class="bq-sources">
-  <div><strong class="bq-eyebrow bq-eyebrow--ink">Sources</strong><ul>${x.sources.map((s) => `<li>${esc(s)}</li>`).join('')}</ul></div>
-  <div><strong class="bq-eyebrow bq-eyebrow--ink">Changelog</strong><ul class="bq-changelog"><li><time>${esc(x.updated)}</time><span>Checked and updated.</span></li><li><time>${esc(x.published)}</time><span>First published.</span></li></ul></div>
+<section class="bq-helpful" data-bq-helpful><strong>Was this article helpful?</strong><div><button type="button" data-vote="yes">Yes</button><button type="button" data-vote="no">No</button></div></section>
+
+<section class="bq-about">${avatar(x.author)}
+  <div><span class="bq-eyebrow">About the author</span><a class="bq-about__name" href="${authorUrl(x.author)}">${esc(a.name)}</a><p>${esc(a.bio)}</p></div>
 </section>
 
-<section class="bq-authorbox">${avatar(x.author)}
-  <div><strong>${esc(a.name)}</strong><p>${esc(a.bio)}</p><a class="bq-link-strong" href="${authorUrl(x.author)}">Profile and all articles</a></div>
-</section>
+<div class="bq-history bq-history--dated"><strong>Update history</strong><ul><li><time>${esc(x.updated)}</time><span>Checked and updated.</span></li><li><time>${esc(x.published)}</time><span>First published.</span></li></ul></div>
+<div class="bq-history"><strong>Sources</strong><ul>${x.sources.map((src) => `<li>${esc(src)}</li>`).join('')}</ul></div>
   </div>
 </div>
 </article>`;
@@ -446,5 +430,6 @@ export function postTypeRows() {
       catSlug: x.cat, authorKey: x.author,
       publishedAt: day(x.published), createdAt: day(x.published), updatedAt: day(x.updated),
     })),
+    batteryInfoRow(),
   ];
 }
