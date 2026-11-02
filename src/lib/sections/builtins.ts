@@ -21,10 +21,15 @@ const num = (s: unknown) => { const m = String(s ?? '').replace(/,/g, '').match(
 
 export const BUILTINS: Builtin[] = [
   {
-    key: 'post-header', name: 'Header', group: 'Page', version: 1, placement: 'top', scope: 'post',
+    key: 'post-header', name: 'Header', group: 'Page', version: 2, placement: 'top', scope: 'post',
     description: 'Breadcrumbs, title, intro, author line and lead photo, filled from the post settings.',
     fields: [
+      { key: 'style', label: 'Look', type: 'select', options: ['Info', 'Guide'], default: 'Info', help: 'Guide: photo beside the title, as on buying guides. Info: taller photo with a caption.' },
       { key: 'tag', label: 'Tag', type: 'text', help: 'Leave empty to show the post type, e.g. "Buying guide".' },
+      { key: 'lead', label: 'Intro', type: 'textarea', help: 'Leave empty to use the excerpt.' },
+      { key: 'byline', label: 'Byline', type: 'text', default: 'Written by', placeholder: 'Tested and written by' },
+      { key: 'parentName', label: 'Middle breadcrumb', type: 'text', placeholder: 'Robot vacuums', help: 'Optional extra breadcrumb between the category and this page.' },
+      { key: 'parentUrl', label: 'Middle breadcrumb link', type: 'link', placeholder: '/guide/robot-vacuums' },
       { key: 'crumb', label: 'Last breadcrumb', type: 'text', help: 'Short name for the breadcrumb, e.g. "Stick vacuums". Defaults to the title.' },
       { key: 'extraLabel', label: 'Extra meta label', type: 'text', placeholder: 'Test period' },
       { key: 'extraValue', label: 'Extra meta value', type: 'text', placeholder: '6 weeks · 22 models' },
@@ -35,25 +40,27 @@ export const BUILTINS: Builtin[] = [
     ],
     prepare: (d, post) => {
       if (!d.image) d.image = post.coverImage ?? '';
+      if (!d.lead) d.lead = post.excerpt ?? '';
+      d.guideLook = d.style === 'Guide';
       if (!d.tag) d.tag = post.typeLabel;
       if (!d.crumb) d.crumb = post.title;
       if (!d.extraLabel && post.testedCount) { d.extraLabel = 'Test period'; d.extraValue = `${post.testWeeks ? post.testWeeks + ' weeks · ' : ''}${post.testedCount} models`; }
     },
-    template: `<nav class="bq-crumbs"><a href="/">Home</a>{{#post.category}}<a href="{{url}}">{{name}}</a>{{/post.category}}<span>{{crumb}}</span></nav>
+    template: `<nav class="bq-crumbs"><a href="/">Home</a>{{#post.category}}<a href="{{url}}">{{name}}</a>{{/post.category}}{{#parentName}}<a href="{{parentUrl}}">{{parentName}}</a>{{/parentName}}<span>{{crumb}}</span></nav>
 <div class="bq-guide-top">
   <header class="bq-guide-head">
     <span class="bq-tag">{{tag}}</span>
     <h1 class="bq-h1">{{post.title}}</h1>
-    {{#post.excerpt}}<p class="bq-lead">{{post.excerpt}}</p>{{/post.excerpt}}
+    {{#lead}}<p class="bq-lead">{{lead}}</p>{{/lead}}
     <div class="bq-meta">
-      {{#post.author}}<div class="bq-meta__author"><div class="bq-avatar">{{#avatar}}<img src="{{avatar}}" alt="{{name}}">{{/avatar}}</div><div>Written by<br><a href="{{url}}">{{name}}</a></div></div>{{/post.author}}
+      {{#post.author}}<div class="bq-meta__author"><div class="bq-avatar">{{#avatar}}<img src="{{avatar}}" alt="{{name}}">{{/avatar}}</div><div>{{byline}}<br><a href="{{url}}">{{name}}</a></div></div>{{/post.author}}
       {{#showReviewer}}<div>Reviewed by<br><a href="/author/ryan-mitchell">Ryan Mitchell</a>, editor-in-chief</div>{{/showReviewer}}
       <div>Updated<br><strong>{{post.updated}}</strong></div>
       {{#extraLabel}}<div>{{extraLabel}}<br><strong>{{extraValue}}</strong></div>{{/extraLabel}}
     </div>
     <div class="bq-disclosure-row"><p class="bq-disclosure">We choose products independently. We may earn a commission through links on this page; your price stays the same. <a href="/how-we-make-money">Affiliate policy</a></p>{{#copyLink}}<button type="button" class="bq-btn-outline-sm" data-bq-copy>Copy link</button>{{/copyLink}}</div>
   </header>
-  {{#image}}<figure class="bq-hero-fig"><div class="bq-photo"><img src="{{image}}" alt="{{post.title}}"></div>{{#caption}}<figcaption>{{caption}}</figcaption>{{/caption}}</figure>{{/image}}
+  {{#image}}{{#guideLook}}<div class="bq-photo bq-guide-hero"><img src="{{image}}" alt="{{post.title}}"></div>{{/guideLook}}{{^guideLook}}<figure class="bq-hero-fig"><div class="bq-photo"><img src="{{image}}" alt="{{post.title}}"></div>{{#caption}}<figcaption>{{caption}}</figcaption>{{/caption}}</figure>{{/guideLook}}{{/image}}
 </div>`,
     sample: { extraLabel: 'Test period', extraValue: '4 weeks · 9 models', showReviewer: true },
   },
@@ -72,7 +79,7 @@ export const BUILTINS: Builtin[] = [
     ] },
   },
   {
-    key: 'picks', name: 'Our picks at a glance', group: 'Products', version: 1, tocLabel: '{{heading}}',
+    key: 'picks', name: 'Our picks at a glance', group: 'Products', version: 2, tocLabel: '{{heading}}',
     description: 'Pick cards with photo, label, test score, text and an orange "Check price" button.',
     fields: [
       { key: 'heading', label: 'Heading', type: 'text', default: 'Our picks at a glance' },
@@ -88,6 +95,7 @@ export const BUILTINS: Builtin[] = [
         { key: 'shopUrl', label: 'Shop link', type: 'link', help: 'Gets rel="sponsored nofollow" automatically.' },
         { key: 'reviewUrl', label: 'Review link', type: 'link', placeholder: '/review/…' },
       ] },
+      { key: 'reviewLinkText', label: 'Review link text', type: 'text', default: 'Read the full review', help: 'Shown under each card that has a review link. Leave empty to hide.' },
       { key: 'note', label: 'Note under the cards', type: 'text', default: 'Prices change often. Click through to see the current price.' },
     ],
     prepare: (d) => { for (const p of (d.picks as Record<string, unknown>[]) ?? []) if (!p.shopName) p.shopName = 'Amazon'; },
@@ -99,6 +107,7 @@ export const BUILTINS: Builtin[] = [
     <h3 class="bq-pick__name">{{#reviewUrl}}<a href="{{reviewUrl}}">{{name}}</a>{{/reviewUrl}}{{^reviewUrl}}{{name}}{{/reviewUrl}}</h3>
     <div class="bq-pick__text bq-rich">{{{text}}}</div>
     {{#shopUrl}}<div class="bq-shops"><a class="bq-shop" href="{{shopUrl}}" ${AFFILIATE}>Check price on {{shopName}}</a></div>{{/shopUrl}}
+    {{#reviewUrl}}{{#reviewLinkText}}<a class="bq-link-strong" href="{{reviewUrl}}">{{reviewLinkText}}</a>{{/reviewLinkText}}{{/reviewUrl}}
   </div>
 </div>{{/picks}}
 {{#note}}<p class="bq-note">{{note}}</p>{{/note}}</section>`,
@@ -120,7 +129,7 @@ export const BUILTINS: Builtin[] = [
     sample: { heading: 'How we tested', body: 'Each vacuum ran in our salon-style test room for four weeks.\n\nWe swept a fixed mix of hair, cereal and fine sand toward the inlet and weighed what it collected.' },
   },
   {
-    key: 'table', name: 'Table', group: 'Data', version: 1, tocLabel: '{{heading}}',
+    key: 'table', name: 'Table', group: 'Data', version: 2, tocLabel: '{{heading}}',
     description: 'Data table with a dark header row. Mark the best value in a row with *.',
     fields: [
       { key: 'heading', label: 'Heading', type: 'text' },
@@ -128,9 +137,10 @@ export const BUILTINS: Builtin[] = [
       { key: 'head', label: 'Column headings', type: 'cells', placeholder: 'Model | Pickup | Bin | Score', help: 'Separate columns with |' },
       { key: 'rows', label: 'Rows', type: 'list', itemLabel: '{{cells}}', fields: [{ key: 'cells', label: 'Cells', type: 'cells', placeholder: 'EyeVac Pro | 96%* | 4.8 L | 8.9*', help: 'Separate with |. End a value with * to highlight it as best.' }] },
       { key: 'note', label: 'Note under the table', type: 'text' },
+      { key: 'mono', label: 'Numbers in a monospaced font', type: 'toggle', default: false },
     ],
     template: `<section class="bq-section">{{#heading}}<h2 class="bq-h2">{{heading}}</h2>{{/heading}}{{#intro}}<div class="bq-rich">{{{intro}}}</div>{{/intro}}
-<div class="bq-table-wrap"><table class="bq-table">
+<div class="bq-table-wrap"><table class="bq-table{{#mono}} bq-table--mono{{/mono}}">
   <thead><tr>{{#head}}<th>{{value}}</th>{{/head}}</tr></thead>
   <tbody>{{#rows}}<tr>{{#cells}}<td{{#best}} class="bq-win"{{/best}}>{{value}}</td>{{/cells}}</tr>{{/rows}}</tbody>
 </table></div>{{#note}}<p class="bq-note">{{note}}</p>{{/note}}</section>`,
@@ -235,24 +245,28 @@ export const BUILTINS: Builtin[] = [
     sample: { heading: 'Frequently asked questions', items: [{ q: 'Do touchless vacuums work on carpet?', a: 'No. They sit against a wall and take what you sweep toward them on hard floors.' }, { q: 'How loud are they?', a: 'Between 68 and 76 dB in our test, about as loud as a hair dryer for a few seconds.' }] },
   },
   {
-    key: 'author-box', name: 'Author box', group: 'Trust', version: 1,
+    key: 'author-box', name: 'Author box', group: 'Trust', version: 2,
     description: 'Photo, name and bio of the post author. Optionally replace the bio for this post.',
     fields: [
+      { key: 'style', label: 'Look', type: 'select', options: ['Plain', 'Box'], default: 'Plain' },
       { key: 'label', label: 'Label', type: 'text', default: 'About the author' },
       { key: 'customBio', label: 'Bio for this post', type: 'richtext', help: 'Leave empty to use the author’s bio.' },
     ],
-    template: `{{#post.author}}<section class="bq-about"><div class="bq-avatar">{{#avatar}}<img src="{{avatar}}" alt="{{name}}" loading="lazy">{{/avatar}}</div><div><span class="bq-eyebrow">{{label}}</span><a class="bq-about__name" href="{{url}}">{{name}}</a>{{#customBio}}<div class="bq-rich">{{{customBio}}}</div>{{/customBio}}{{^customBio}}<p>{{bio}}</p>{{/customBio}}</div></section>{{/post.author}}`,
+    prepare: (d) => { d.box = d.style === 'Box'; },
+    template: `{{#box}}{{#post.author}}<section class="bq-authorbox"><div class="bq-avatar">{{#avatar}}<img src="{{avatar}}" alt="{{name}}" loading="lazy">{{/avatar}}</div><div><div class="bq-eyebrow" style="color:var(--muted);letter-spacing:0.1em">{{label}}</div><strong>{{name}}</strong>{{#customBio}}<div class="bq-rich">{{{customBio}}}</div>{{/customBio}}{{^customBio}}<p>{{bio}}</p>{{/customBio}}<a class="bq-link-strong" href="{{url}}">Profile and all articles</a></div></section>{{/post.author}}{{/box}}{{^box}}{{#post.author}}<section class="bq-about"><div class="bq-avatar">{{#avatar}}<img src="{{avatar}}" alt="{{name}}" loading="lazy">{{/avatar}}</div><div><span class="bq-eyebrow">{{label}}</span><a class="bq-about__name" href="{{url}}">{{name}}</a>{{#customBio}}<div class="bq-rich">{{{customBio}}}</div>{{/customBio}}{{^customBio}}<p>{{bio}}</p>{{/customBio}}</div></section>{{/post.author}}{{/box}}`,
     sample: { label: 'About the author' },
   },
   {
-    key: 'sources', name: 'Sources and update history', group: 'Trust', version: 1,
+    key: 'sources', name: 'Sources and update history', group: 'Trust', version: 2,
     description: 'Dated update history and a list of sources.',
     fields: [
       { key: 'changes', label: 'Update history', type: 'list', itemLabel: '{{date}} {{text}}', fields: [{ key: 'date', label: 'Date', type: 'text', placeholder: 'Oct 14, 2026' }, { key: 'text', label: 'What changed', type: 'text' }] },
       { key: 'sources', label: 'Sources', type: 'list', itemLabel: '{{text}}', fields: [{ key: 'text', label: 'Source', type: 'text' }] },
+      { key: 'style', label: 'Look', type: 'select', options: ['List', 'Two columns'], default: 'List' },
     ],
-    template: `{{#changes}}{{#@first}}<div class="bq-history bq-history--dated"><strong>Update history</strong><ul>{{/@first}}<li><time>{{date}}</time><span>{{text}}</span></li>{{#@last}}</ul></div>{{/@last}}{{/changes}}
-{{#sources}}{{#@first}}<div class="bq-history"><strong>Sources</strong><ul>{{/@first}}<li>{{text}}</li>{{#@last}}</ul></div>{{/@last}}{{/sources}}`,
+    prepare: (d) => { d.columns = d.style === 'Two columns'; },
+    template: `{{#columns}}<section class="bq-sources"><div><strong class="bq-eyebrow bq-eyebrow--ink">Sources</strong><ul>{{#sources}}<li>{{text}}</li>{{/sources}}</ul></div><div><strong class="bq-eyebrow bq-eyebrow--ink">Changelog</strong><ul class="bq-changelog">{{#changes}}<li><time>{{date}}</time><span>{{text}}</span></li>{{/changes}}</ul></div></section>{{/columns}}{{^columns}}{{#changes}}{{#@first}}<div class="bq-history bq-history--dated"><strong>Update history</strong><ul>{{/@first}}<li><time>{{date}}</time><span>{{text}}</span></li>{{#@last}}</ul></div>{{/@last}}{{/changes}}
+{{#sources}}{{#@first}}<div class="bq-history"><strong>Sources</strong><ul>{{/@first}}<li>{{text}}</li>{{#@last}}</ul></div>{{/@last}}{{/sources}}{{/columns}}`,
     sample: { changes: [{ date: 'Oct 14, 2026', text: 'Prices checked and results updated.' }, { date: 'Mar 2, 2026', text: 'First published.' }], sources: [{ text: 'BrasQ test protocol (2026)' }, { text: 'Manufacturer manuals and spec sheets' }] },
   },
   {
@@ -266,7 +280,7 @@ export const BUILTINS: Builtin[] = [
     sample: { heading: 'Keep reading', posts: [] },
   },
   {
-    key: 'custom-html', name: 'Custom HTML', group: 'Other', version: 1, tocLabel: '{{tocTitle}}',
+    key: 'custom-html', name: 'Custom HTML', group: 'Other', version: 2, tocLabel: '{{tocTitle}}',
     description: 'Any HTML, using the bq-* classes. Existing HTML posts become one of these.',
     fields: [
       { key: 'html', label: 'HTML', type: 'code' },

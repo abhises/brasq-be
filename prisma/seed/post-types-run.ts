@@ -4,7 +4,7 @@
  *   npm run db:seed:post-types
  */
 import 'dotenv/config';
-import { prisma } from '../../src/db.js';
+import { prisma, Prisma } from '../../src/db.js';
 import { postTypeRows } from './post-types.js';
 import { authorSlug } from './templates.js';
 
@@ -15,7 +15,8 @@ async function main() {
       prisma.category.findUnique({ where: { slug: catSlug } }),
       prisma.author.findUnique({ where: { slug: authorSlug(authorKey) } }),
     ]);
-    const data = { ...row, status: 'published' as const, categoryId: category?.id ?? null, authorId: author?.id ?? null };
+    // sections: null so the conversion step after this script rebuilds the post from the fresh HTML
+    const data = { ...row, status: 'published' as const, categoryId: category?.id ?? null, authorId: author?.id ?? null, sections: Prisma.DbNull };
     const existing = await prisma.post.findUnique({ where: { type_slug: { type: row.type, slug: row.slug } } });
     if (existing) { await prisma.post.update({ where: { id: existing.id }, data }); updated++; }
     else { await prisma.post.create({ data }); created++; }

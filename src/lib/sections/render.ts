@@ -10,6 +10,10 @@ export const sectionItemSchema = z.object({
   type: z.string().min(1),
   data: z.record(z.string(), z.unknown()).default({}),
   hidden: z.boolean().optional(),
+  /** Overrides the type's position: "top" / "bottom" = full width above / below the columns */
+  placement: z.enum(['top', 'body', 'bottom']).optional(),
+  /** Overrides the name in the table of contents; "" keeps the section out of it */
+  tocLabel: z.string().optional(),
 });
 export const sectionsDocSchema = z.object({
   /**
@@ -17,6 +21,11 @@ export const sectionsDocSchema = z.object({
    * "raw": no page frame at all, sections are output as they are (posts converted from full-page HTML)
    */
   layout: z.enum(['toc', 'wide', 'raw']).default('toc'),
+  /** Extra classes for the page wrapper, e.g. "bq-compare" or "bq-infopost" for those page styles */
+  className: z.string().regex(/^[a-z0-9_\- ]*$/i).optional(),
+  /** Heading of the table of contents (default "On this page") and whether it ends with a "Back to top" link */
+  tocTitle: z.string().optional(),
+  backToTop: z.boolean().optional(),
   items: z.array(sectionItemSchema),
 });
 export type SectionsDoc = z.infer<typeof sectionsDocSchema>;
@@ -88,14 +97,14 @@ export async function renderItems(items: SectionsDoc['items'], post: Record<stri
     builtin?.prepare?.(data, post);
     try { await builtin?.load?.(data); } catch (e) { console.error(`Section "${s.type}" could not load its data`, e); }
     let toc = '';
-    try { toc = t.tocLabel ? renderTemplate(t.tocLabel, data, { post }).replace(/<[^>]+>/g, '').trim() : ''; } catch { /* bad label: leave out of TOC */ }
+    try { toc = s.tocLabel !== undefined ? s.tocLabel.trim() : t.tocLabel ? renderTemplate(t.tocLabel, data, { post }).replace(/<[^>]+>/g, '').trim() : ''; } catch { /* bad label: leave out of TOC */ }
     let anchor = slugify(toc || s.type) || 's';
     if (used.has(anchor)) anchor = `${anchor}-${s.id.slice(-4)}`;
     used.add(anchor);
     let html: string;
     try { html = renderTemplate(t.template, data, { post, section: { id: s.id, anchor } }); }
     catch (e) { html = `<!-- section "${escapeHtml(s.type)}" failed: ${escapeHtml((e as Error).message)} -->`; }
-    out.push({ id: s.id, type: s.type, anchor, placement: t.placement, html, toc });
+    out.push({ id: s.id, type: s.type, anchor, placement: s.placement ?? t.placement, html, toc });
   }
   return out;
 }
@@ -110,20 +119,21 @@ export async function renderDoc(doc: SectionsDoc, post: Record<string, unknown>)
   const bottom = parts.filter((p) => p.placement === 'bottom').map(wrap).join('\n');
   const tocItems = parts.filter((p) => p.toc && p.placement !== 'top' && p.placement !== 'bottom');
   if (doc.layout === 'raw') return parts.map(wrap).join('\n');
+  const cls = doc.className ? ` ${doc.className.trim()}` : '';
   if (doc.layout === 'wide' || tocItems.length < 2) {
-    return `<article class="bq-article bq-sections bq-sections--wide">\n${top}\n<div class="bq-content bq-content--wide">\n${body}\n</div>\n${bottom}\n</article>`;
+    return `<article class="bq-article bq-sections bq-sections--wide${cls}">\n${top}\n<div class="bq-content bq-content--wide">\n${body}\n</div>\n${bottom}\n</article>`;
   }
+  const tocTitle = doc.tocTitle?.trim() || 'On this page';
   const links = tocItems.map((p) => `<a href="#${p.anchor}">${escapeHtml(p.toc)}</a>`).join('\n    ');
-  return `<article class="bq-article bq-sections">
+  return `<article class="bq-article bq-sections${cls}">
 ${top}
 <div class="bq-layout">
   <aside class="bq-toc" data-bq-spy>
-    <div class="bq-toc__title">On this page</div>
-    ${links}
-    <a class="bq-toc__top" href="#">Back to top ↑</a>
+    <div class="bq-toc__title">${escapeHtml(tocTitle)}</div>
+    ${links}${doc.backToTop === false ? '' : '\n    <a class="bq-toc__top" href="#">Back to top ↑</a>'}
   </aside>
   <div class="bq-content">
-<details class="bq-toc-mobile"><summary>On this page</summary><nav>${tocItems.map((p) => `<a href="#${p.anchor}">${escapeHtml(p.toc)}</a>`).join('')}</nav></details>
+<details class="bq-toc-mobile"><summary>${escapeHtml(tocTitle)}</summary><nav>${tocItems.map((p) => `<a href="#${p.anchor}">${escapeHtml(p.toc)}</a>`).join('')}</nav></details>
 ${body}
   </div>
 </div>
