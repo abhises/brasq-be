@@ -11,6 +11,10 @@ enum PostType {
   guide
   review
   page
+  /// Two to four products side by side ("product x vs product y")
+  comparison
+  /// Explainers and how-tos that don't rank products
+  informational
 }
 
 enum PostStatus {

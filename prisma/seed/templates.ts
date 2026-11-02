@@ -57,6 +57,8 @@ export function productPhoto(p: Pick, n = 0) {
   return poolPick(p.guide.cat, p.id, n + k + 3);
 }
 export const authorPhoto = (key: string) => L[key];
+/** A photo from the library by key (R1, V3, C4 …), for posts that aren't tied to one guide or product. */
+export const libPhoto = (key: string) => L[key];
 export const testHousePhoto = L.V3;
 
 const img = (src: string, alt: string, cls = '') => `<div class="bq-photo ${cls}"><img src="${esc(src)}" alt="${esc(alt)}" loading="lazy"></div>`;

@@ -45,7 +45,7 @@ DELETE /api/admin/media/:id
 GET    /api/admin/subscribers[?format=csv]
 ```
 
-Post fields: `type` (guide|review|page), `status` (draft|published), `slug`, `title`, `excerpt`, `html`, `css`,
+Post fields: `type` (guide|review|comparison|informational|page), `status` (draft|published), `slug`, `title`, `excerpt`, `html`, `css`,
 `coverImage`, `seoTitle`, `seoDescription`, `jsonLd`, `testedCount`, `testWeeks`, `topPick`,
 `stickyBar` ({name, score, price, shop, url, image} or null), `newsletterPopup`, `featured` (home hero),
 `categoryId`/`categorySlug`, `authorId`/`authorSlug`, `publishedAt`.

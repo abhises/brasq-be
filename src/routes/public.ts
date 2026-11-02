@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { identify } from '../lib/auth.js';
 import { prisma, Prisma } from '../db.js';
 import { HttpError } from '../lib/http.js';
+import { ARTICLE_TYPES, postType } from '../lib/post-types.js';
 
 export const publicRouter = Router();
 
@@ -41,7 +42,7 @@ publicRouter.get('/home', async (_req, res) => {
 
 publicRouter.get('/posts', async (req, res) => {
   const q = z.object({
-    type: z.enum(['guide', 'review', 'page']).optional(),
+    type: postType.optional(),
     category: z.string().optional(),
     author: z.string().optional(),
     limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -55,7 +56,7 @@ publicRouter.get('/posts', async (req, res) => {
 
 /** Full post. Drafts are only returned to authenticated callers with ?preview=1 */
 publicRouter.get('/posts/:type/:slug', async (req, res) => {
-  const type = z.enum(['guide', 'review', 'page']).parse(req.params.type);
+  const type = postType.parse(req.params.type);
   const preview = req.query.preview === '1' && (await identify(req));
   const post = await prisma.post.findFirst({
     where: { type, slug: req.params.slug, ...(preview ? {} : published) },
@@ -68,13 +69,15 @@ publicRouter.get('/posts/:type/:slug', async (req, res) => {
 publicRouter.get('/categories/:slug', async (req, res) => {
   const category = await prisma.category.findUnique({ where: { slug: req.params.slug } });
   if (!category) throw new HttpError(404, 'Not found');
-  const [guides, others] = await Promise.all([
-    prisma.post.findMany({ where: { ...published, type: 'guide', categoryId: category.id }, select: cardSelect, orderBy: { publishedAt: 'desc' } }),
+  const inCat = (type: 'guide' | 'comparison' | 'informational') =>
+    prisma.post.findMany({ where: { ...published, type, categoryId: category.id }, select: cardSelect, orderBy: { publishedAt: 'desc' } });
+  const [guides, comparisons, explainers, others] = await Promise.all([
+    inCat('guide'), inCat('comparison'), inCat('informational'),
     prisma.category.findMany({ where: { NOT: { id: category.id } }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }], select: { slug: true, name: true } }),
   ]);
   const authorSlugs = [...new Set(guides.map((g) => g.author?.slug).filter(Boolean))] as string[];
   const authors = await prisma.author.findMany({ where: { slug: { in: authorSlugs } }, select: authorCard });
-  res.json({ category, guides, authors, others });
+  res.json({ category, guides, comparisons, explainers, authors, others });
 });
 
 publicRouter.get('/authors', async (_req, res) => {
@@ -85,7 +88,7 @@ publicRouter.get('/authors/:slug', async (req, res) => {
   const author = await prisma.author.findUnique({ where: { slug: req.params.slug } });
   if (!author) throw new HttpError(404, 'Not found');
   const posts = await prisma.post.findMany({
-    where: { ...published, authorId: author.id, type: { in: ['guide', 'review'] } },
+    where: { ...published, authorId: author.id, type: { in: [...ARTICLE_TYPES] } },
     select: cardSelect, orderBy: [{ type: 'asc' }, { updatedAt: 'desc' }],
   });
   res.json({ author, posts });
@@ -100,7 +103,7 @@ publicRouter.get('/search', async (req, res) => {
   const like = { contains: q, mode: 'insensitive' as const };
   const [posts, authors, categories] = await Promise.all([
     prisma.post.findMany({
-      where: { ...published, type: { in: ['guide', 'review'] }, OR: [{ title: like }, { excerpt: like }, { topPick: like }] },
+      where: { ...published, type: { in: [...ARTICLE_TYPES] }, OR: [{ title: like }, { excerpt: like }, { topPick: like }] },
       select: cardSelect, orderBy: [{ type: 'asc' }, { updatedAt: 'desc' }], take: 50,
     }),
     prisma.author.findMany({ where: { OR: [{ name: like }, { role: like }] }, select: authorCard }),

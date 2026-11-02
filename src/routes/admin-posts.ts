@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma, Prisma } from '../db.js';
 import { HttpError, paging, slugify } from '../lib/http.js';
+import { postType } from '../lib/post-types.js';
 
 export const adminPostsRouter = Router();
 
@@ -11,7 +12,7 @@ const stickyBar = z.object({
 }).nullable();
 
 const postInput = z.object({
-  type: z.enum(['guide', 'review', 'page']),
+  type: postType,
   status: z.enum(['draft', 'published']),
   slug: z.string(),
   title: z.string().min(1),
@@ -64,7 +65,7 @@ const listSelect = {
 
 adminPostsRouter.get('/', async (req, res) => {
   const q = z.object({
-    type: z.enum(['guide', 'review', 'page']).optional(),
+    type: postType.optional(),
     status: z.enum(['draft', 'published']).optional(),
     q: z.string().optional(),
   }).parse(req.query);
@@ -95,7 +96,7 @@ adminPostsRouter.post('/', async (req, res) => {
 
 /** Create or update by type + slug. Handy for automation: re-running the same job updates the post. */
 adminPostsRouter.put('/by-slug/:type/:slug', async (req, res) => {
-  const type = z.enum(['guide', 'review', 'page']).parse(req.params.type);
+  const type = postType.parse(req.params.type);
   const slug = slugify(req.params.slug);
   const input = postInput.parse(req.body);
   const existing = await prisma.post.findUnique({ where: { type_slug: { type, slug } } });

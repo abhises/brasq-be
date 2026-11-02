@@ -10,6 +10,7 @@ import {
   authorPhoto, authorSlug, dealsHtml, guideHtml, guideJsonLd, guidePhoto, infoHtml, infoSlugs, methodHtml,
   productPhoto, products, reviewHtml, usd, amazon,
 } from './templates.js';
+import { postTypeRows } from './post-types.js';
 
 const SITE_URL = (process.env.SITE_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 const day = (s: string) => new Date(s + ' 12:00 UTC');
@@ -79,6 +80,11 @@ async function main() {
         publishedAt: day(g.published), createdAt: day(g.published), updatedAt: day(g.updated),
       },
     });
+  }
+
+  // comparison and informational posts
+  for (const { catSlug, authorKey, ...row } of postTypeRows()) {
+    await prisma.post.create({ data: { ...row, status: 'published', categoryId: catIds[catSlug], authorId: authorIds[authorKey] } });
   }
 
   const pages: { slug: string; title: string; excerpt: string; html: string }[] = [
