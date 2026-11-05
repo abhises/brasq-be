@@ -34,9 +34,13 @@ adminCategoriesRouter.delete('/:id', async (req, res) => {
 
 export const adminAuthorsRouter = Router();
 
+/** Optional link to a profile page: must be a full http(s) URL so it can't carry javascript: */
+const profileUrl = z.string().trim().regex(/^https?:\/\/\S+$/i, 'must be a full link starting with https://').nullable();
+
 const authorInput = z.object({
   name: z.string().min(1), slug: z.string(), role: z.string(), short: z.string(), bio: z.string(),
   email: z.string().nullable(), avatarUrl: z.string().nullable(),
+  linkedinUrl: profileUrl, youtubeUrl: profileUrl,
   facts: z.array(z.object({ value: z.string(), label: z.string() })),
   expertise: z.array(z.string()),
   career: z.array(z.object({ years: z.string(), text: z.string() })),

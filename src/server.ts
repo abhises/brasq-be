@@ -13,6 +13,7 @@ import { adminFrontPageRouter, publicFrontPage } from './routes/front-page.js';
 import { syncBuiltins } from './lib/sections/sync.js';
 import { adminAuthorsRouter, adminCategoriesRouter, adminSubscribersRouter } from './routes/admin-taxonomy.js';
 import { authRouter } from './routes/auth.js';
+import { adminStatsRouter } from './routes/admin-stats.js';
 import { publicRouter } from './routes/public.js';
 
 const app = express();
@@ -37,6 +38,7 @@ app.use('/api/admin/subscribers', requireAuth, adminSubscribersRouter);
 app.use('/api/admin/section-types', requireAuth, adminSectionsRouter);
 app.use('/api/admin/products', requireAuth, adminProductsRouter);
 app.use('/api/admin/front-page', requireAuth, adminFrontPageRouter);
+app.use('/api/admin/stats', requireAuth, adminStatsRouter);
 
 app.use((_req, res) => { res.status(404).json({ error: 'Not found' }); });
 app.use(errorHandler);

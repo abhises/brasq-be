@@ -52,8 +52,8 @@ Changing a setting: edit `~/brasq/env/<app>.env`, then re-release the live image
 | Secret | Value |
 |---|---|
 | `DEPLOY_SSH_KEY` | private key of the deploy key (`~/.ssh/brasq_deploy` on the dev machine) |
-| `DEPLOY_HOST` | `13.48.57.12` |
-| `DEPLOY_KNOWN_HOSTS` | output of `ssh-keyscan -t ed25519 13.48.57.12` |
+| `DEPLOY_HOST` | `13.49.71.156` |
+| `DEPLOY_KNOWN_HOSTS` | output of `ssh-keyscan -t ed25519 13.49.71.156` |
 | `DEPLOY_USER` | optional, defaults to `ubuntu` |
 
 ## Database migrations

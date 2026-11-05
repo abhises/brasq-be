@@ -42,6 +42,9 @@ model Author {
   bio        String   @default("")
   email      String?
   avatarUrl  String?
+  /// Full profile URLs shown on the author page
+  linkedinUrl String?
+  youtubeUrl  String?
   /// [{ value, label }]
   facts      Json     @default("[]")
   /// ["Vacuums", ...]
